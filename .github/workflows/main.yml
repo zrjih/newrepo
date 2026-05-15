@@ -40,9 +40,9 @@ jobs:
 
       - name: Start Ngrok Tunnel
         run: |
-          Write-Host "Starting ngrok with logging..."
+          Write-Host "Starting ngrok..."
           $proc = Start-Process -FilePath ".\ngrok\ngrok.exe" `
-            -ArgumentList "tcp","3389","--log=stdout","--log-format=logfmt","--web-addr=127.0.0.1:4040" `
+            -ArgumentList "tcp","3389" `
             -NoNewWindow -PassThru
           Write-Host "ngrok PID: $($proc.Id)"
           Write-Host "Waiting 15s for ngrok to initialize..."
