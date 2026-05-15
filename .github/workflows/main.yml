@@ -37,17 +37,33 @@ jobs:
 
       - name: Get Ngrok URL
         run: |
+          Write-Host "Checking ngrok process..."
+          Get-Process ngrok -ErrorAction SilentlyContinue | Format-List Name,Id,StartTime
+          Write-Host "Querying ngrok API (attempt 1)..."
           $url = $null
           for ($i = 0; $i -lt 20; $i++) {
+            Write-Host "Attempt $($i+1) of 20..."
             try {
               $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction Stop
+              Write-Host "API response received. Tunnels count: $($resp.tunnels.Count)"
               $url = $resp.tunnels[0].public_url
+              Write-Host "Got URL: $url"
               break
             } catch {
+              Write-Host "Attempt $($i+1) failed: $($_.Exception.Message)"
               Start-Sleep -Seconds 5
             }
           }
-          if (-not $url) { Write-Error "Could not get ngrok URL"; exit 1 }
+          if (-not $url) {
+            Write-Host "Trying direct ngrok status check..."
+            try {
+              $status = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/status" -ErrorAction Stop
+              Write-Host "Status: $($status | ConvertTo-Json -Depth 3)"
+            } catch {
+              Write-Host "Status check also failed: $($_.Exception.Message)"
+            }
+            Write-Error "Could not get ngrok URL after 20 attempts"; exit 1
+          }
           Write-Host "==========================================="
           Write-Host "  RDP Connection Details"
           Write-Host "==========================================="
