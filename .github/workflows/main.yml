@@ -24,32 +24,36 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 1
 
       - name: Set User Password
+        shell: cmd
         run: |
-          net user runneradmin RDPaccess123! /add 2>$null
-          net localgroup administrators runneradmin /add 2>$null
+          net user runneradmin RDPaccess123! 2>nul || echo User exists, updating password
+          net localgroup administrators runneradmin /add 2>nul || echo Already admin
 
       - name: Start Ngrok Tunnel
-        run: Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389","--webaddr=127.0.0.1","--webport=4040" -WindowStyle Hidden
-
-      - name: Wait & Get Ngrok URL
         run: |
+          Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389","--webaddr=127.0.0.1","--webport=4040" -WindowStyle Hidden
           Start-Sleep -Seconds 15
-          $attempts = 0
-          $publicUrl = $null
-          while ($attempts -lt 10 -and -not $publicUrl) {
+
+      - name: Get Ngrok URL
+        run: |
+          $url = $null
+          for ($i = 0; $i -lt 20; $i++) {
             try {
-              $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels"
-              $publicUrl = $resp.tunnels[0].public_url
+              $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction Stop
+              $url = $resp.tunnels[0].public_url
+              break
             } catch {
               Start-Sleep -Seconds 5
             }
-            $attempts++
           }
-          if (-not $publicUrl) { Write-Error "Failed to get ngrok URL"; exit 1 }
+          if (-not $url) { Write-Error "Could not get ngrok URL"; exit 1 }
           Write-Host "==========================================="
-          Write-Host "RDP Connection Info:"
-          Write-Host "Address : $publicUrl"
-          Write-Host "User    : runneradmin"
-          Write-Host "Password: RDPaccess123!"
+          Write-Host "  RDP Connection Details"
           Write-Host "==========================================="
-          Start-Sleep -Seconds 21600
+          Write-Host "  Address : $url"
+          Write-Host "  User    : runneradmin"
+          Write-Host "  Password: RDPaccess123!"
+          Write-Host "==========================================="
+
+      - name: Keep Alive
+        run: Start-Sleep -Seconds 21400
