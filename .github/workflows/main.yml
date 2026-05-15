@@ -18,12 +18,14 @@ jobs:
         run: |
           & .\ngrok\ngrok.exe authtoken 2hq6S3OFtWLImVyr15ERQC8BU95_3GKiQwzcqAkxpLK3m7cMt
           $configPath = "$env:LOCALAPPDATA\ngrok\ngrok.yml"
-          Write-Host "Config file: $configPath"
-          $existing = Get-Content -Path $configPath -Raw
-          Write-Host "Existing config:`n$existing"
-          $updated = $existing.TrimEnd() + "`nweb_addr: 127.0.0.1:4040`n"
-          Set-Content -Path $configPath -Value $updated -Force
-          Write-Host "Updated config:"
+          $config = @"
+          version: "3"
+          agent:
+            authtoken: 2hq6S3OFtWLImVyr15ERQC8BU95_3GKiQwzcqAkxpLK3m7cMt
+            web_addr: 127.0.0.1:4040
+          "@
+          Set-Content -Path $configPath -Value $config.Trim() -Force
+          Write-Host "Config:"
           Get-Content -Path $configPath
 
       - name: Enable RDP
