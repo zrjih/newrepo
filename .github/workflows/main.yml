@@ -25,20 +25,27 @@ jobs:
 
       - name: Set User Password
         run: |
-          $password = "RDPaccess123!"
-          $user = "runneradmin"
-          net user $user $password /add /y
-          net localgroup administrators $user /add
-          net user $user $password
+          net user runneradmin RDPaccess123! /add 2>$null
+          net localgroup administrators runneradmin /add 2>$null
 
       - name: Start Ngrok Tunnel
-        run: Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
+        run: Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389","--webaddr=127.0.0.1","--webport=4040" -WindowStyle Hidden
 
       - name: Wait & Get Ngrok URL
         run: |
-          Start-Sleep -Seconds 10
-          $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels"
-          $publicUrl = $resp.tunnels[0].public_url
+          Start-Sleep -Seconds 15
+          $attempts = 0
+          $publicUrl = $null
+          while ($attempts -lt 10 -and -not $publicUrl) {
+            try {
+              $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels"
+              $publicUrl = $resp.tunnels[0].public_url
+            } catch {
+              Start-Sleep -Seconds 5
+            }
+            $attempts++
+          }
+          if (-not $publicUrl) { Write-Error "Failed to get ngrok URL"; exit 1 }
           Write-Host "==========================================="
           Write-Host "RDP Connection Info:"
           Write-Host "Address : $publicUrl"
