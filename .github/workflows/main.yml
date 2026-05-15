@@ -13,14 +13,17 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
           Expand-Archive -Path ngrok.zip -DestinationPath ngrok -Force
-          Write-Host "Listing ngrok directory contents..."
-          Get-ChildItem -Path .\ngrok -Recurse | Select-Object FullName
 
-      - name: Auth Ngrok
+      - name: Auth & Configure Ngrok
         run: |
-          $ngrokExe = Get-ChildItem -Path .\ngrok -Filter ngrok.exe -Recurse | Select-Object -First 1
-          Write-Host "Found ngrok at: $($ngrokExe.FullName)"
-          & $ngrokExe.FullName authtoken 2hq6S3OFtWLImVyr15ERQC8BU95_3GKiQwzcqAkxpLK3m7cMt
+          & .\ngrok\ngrok.exe authtoken 2hq6S3OFtWLImVyr15ERQC8BU95_3GKiQwzcqAkxpLK3m7cMt
+          $config = @"
+          version: 2
+          web_addr: 127.0.0.1:4040
+          "@
+          $config | Set-Content -Path "$env:USERPROFILE\.ngrok2\ngrok.yml" -Force
+          $config | Set-Content -Path ".\ngrok.yml" -Force
+          Write-Host "Config written"
 
       - name: Enable RDP
         run: |
@@ -37,61 +40,45 @@ jobs:
 
       - name: Start Ngrok Tunnel
         run: |
-          $ngrokExe = Get-ChildItem -Path .\ngrok -Filter ngrok.exe -Recurse | Select-Object -First 1
-          Write-Host "Starting ngrok from: $($ngrokExe.FullName)"
-          $proc = Start-Process -FilePath $ngrokExe.FullName -ArgumentList "tcp 3389" -RedirectStandardOutput ".\ngrok-out.log" -RedirectStandardError ".\ngrok-err.log" -WindowStyle Hidden -PassThru
+          Write-Host "Starting ngrok with logging..."
+          $proc = Start-Process -FilePath ".\ngrok\ngrok.exe" `
+            -ArgumentList "tcp","3389","--log=stdout","--log-format=logfmt","--web-addr=127.0.0.1:4040" `
+            -NoNewWindow -PassThru
           Write-Host "ngrok PID: $($proc.Id)"
-          Write-Host "Waiting 10s for ngrok to start..."
-          Start-Sleep -Seconds 10
-          Write-Host "Checking process..."
+          Write-Host "Waiting 15s for ngrok to initialize..."
+          Start-Sleep -Seconds 15
           $running = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
-          if ($running) { Write-Host "ngrok is running (PID: $($proc.Id))" }
-          else { Write-Host "WARNING: ngrok process NOT found!" }
-          if (Test-Path ".\ngrok-err.log") {
-            Write-Host "ngrok stderr:"
-            Get-Content ".\ngrok-err.log"
-          }
+          if ($running) { Write-Host "ngrok is running" }
+          else { Write-Host "WARNING: ngrok process NOT found! It may have crashed." }
 
       - name: Get Ngrok URL
         run: |
+          Write-Host "Listing processes with 'ngrok'..."
+          Get-Process | Where-Object { $_.Name -like "*ngrok*" } | Format-Table Name,Id
+          Write-Host "Checking port 4040..."
+          netstat -ano | findstr ":4040"
           $url = $null
           for ($i = 0; $i -lt 30; $i++) {
             Write-Host "Attempt $($i+1) of 30..."
             try {
               $resp = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction Stop
-              Write-Host "API OK. Tunnels: $($resp.tunnels.Count)"
-              $url = $resp.tunnels[0].public_url
-              Write-Host "URL: $url"
+              Write-Host "API response received!"
+              $tunnels = $resp.tunnels
+              Write-Host "Tunnels count: $($tunnels.Count)"
+              foreach ($t in $tunnels) {
+                Write-Host "  Tunnel: $($t.name) -> $($t.public_url)"
+              }
+              $url = $tunnels[0].public_url
               break
             } catch {
               Write-Host "Failed: $($_.Exception.Message)"
             }
-            # Also check ngrok v3 API at port 4040 /api/tunnels
-            try {
-              $resp2 = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -ErrorAction SilentlyContinue
-              if ($resp2 -and $resp2.tunnels) {
-                $url = $resp2.tunnels[0].public_url
-                Write-Host "Got URL from API: $url"
-                break
-              }
-            } catch {}
             Start-Sleep -Seconds 5
           }
           if (-not $url) {
-            Write-Host "Checking listening ports..."
-            netstat -ano | findstr "4040"
+            Write-Host "=== All listening ports ==="
             netstat -ano | findstr "LISTENING"
-            Write-Host "Checking ngrok process..."
-            Get-Process ngrok -ErrorAction SilentlyContinue | Format-List Name,Id
-            if (Test-Path ".\ngrok-err.log") {
-              Write-Host "=== ngrok error log ==="
-              Get-Content ".\ngrok-err.log"
-            }
-            if (Test-Path ".\ngrok-out.log") {
-              Write-Host "=== ngrok output log ==="
-              Get-Content ".\ngrok-out.log"
-            }
-            Write-Error "Could not get ngrok URL"; exit 1
+            Write-Error "Could not get ngrok URL after 30 attempts"; exit 1
           }
           Write-Host "==========================================="
           Write-Host "  RDP Connection Details"
