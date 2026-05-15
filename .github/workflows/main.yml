@@ -17,13 +17,14 @@ jobs:
       - name: Auth & Configure Ngrok
         run: |
           & .\ngrok\ngrok.exe authtoken 2hq6S3OFtWLImVyr15ERQC8BU95_3GKiQwzcqAkxpLK3m7cMt
-          New-Item -ItemType Directory -Path "$env:USERPROFILE\.ngrok2" -Force | Out-Null
-          $config = @"
-          version: 2
-          web_addr: 127.0.0.1:4040
-          "@
-          $config | Set-Content -Path "$env:USERPROFILE\.ngrok2\ngrok.yml" -Force
-          Write-Host "Config written"
+          $configPath = "$env:LOCALAPPDATA\ngrok\ngrok.yml"
+          Write-Host "Config file: $configPath"
+          $existing = Get-Content -Path $configPath -Raw
+          Write-Host "Existing config:`n$existing"
+          $updated = $existing.TrimEnd() + "`nweb_addr: 127.0.0.1:4040`n"
+          Set-Content -Path $configPath -Value $updated -Force
+          Write-Host "Updated config:"
+          Get-Content -Path $configPath
 
       - name: Enable RDP
         run: |
