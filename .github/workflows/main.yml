@@ -26,8 +26,9 @@ jobs:
       - name: Set User Password
         shell: cmd
         run: |
-          net user runneradmin RDPaccess123! 2>nul || echo User exists, updating password
-          net localgroup administrators runneradmin /add 2>nul || echo Already admin
+          net user runneradmin RDPaccess123! 2>nul
+          net localgroup administrators runneradmin /add 2>nul
+          exit 0
 
       - name: Start Ngrok Tunnel
         run: |
