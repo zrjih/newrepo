@@ -1,4 +1,4 @@
-name: Windows RDP
+name: Cloud Desktop
 
 on:
   workflow_dispatch:
@@ -11,10 +11,10 @@ jobs:
     steps:
       - name: Download Ngrok
         run: |
-          InvokeWebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
+          Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip"
           Expand-Archive ngrok.zip
 
-- name: Auth Ngrok
+      - name: Auth Ngrok
         run: .\ngrok\ngrok.exe authtoken cr_2hq6S3OFtWLImVyr15ERQC8BU95
 
       - name: Enable RDP
@@ -43,6 +43,6 @@ jobs:
           Write-Host "RDP Connection Info:"
           Write-Host "Address : $publicUrl"
           Write-Host "User    : runneradmin"
-          Write-Host "Password: (your RDP_PASSWORD secret)"
+          Write-Host "Password: RDPaccess123!"
           Write-Host "==========================================="
           Start-Sleep -Seconds 21600
